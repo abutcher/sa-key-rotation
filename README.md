@@ -1,5 +1,9 @@
 # Service Account Signer Key Rotation
 
+This repository contains notes on rotating the bound service account signing key used by an OpenShift cluster.
+
+## Notes
+
 The OIDC issuer contains a `"keys.json"` key set which includes the public service Account signing key and information about the key such as the algorithm used to generate the key, etc. Third party integrations that want to verify the bound tokens issued by the service account signer will use the public keys defined in this key set file. Our replacement public key will need to be added to this key set file within our OIDC issuer so that third parties can verify bound tokens issued by the new private key.
 
 ```json
@@ -52,7 +56,9 @@ metadata:
 Background taken from [BZ1934363](https://bugzilla.redhat.com/show_bug.cgi?id=1934363):
 "Any 3rd party integration that wants to verify bound tokens issued by a cluster needs to watch the configmap `openshift-config-managed/bound-sa-token-signing-certs`. This configmap contains the public keys needed to validate issued tokens. In the event of rotation the new public key will be added to the configmap and this key will be required to verify tokens issued by the new private key. Deploying a 3rd party integration statically with only a fixed set of public key(s) risks being unable to verify bound tokens issued after keypair rotation."
 
-## Generate New RSA Key Pair
+## Rotating service account signer RSA keys
+
+### Generate New RSA Key Pair
 
 ```sh
 $ ccoctl aws create-key-pair --output-dir ./new
@@ -62,7 +68,7 @@ $ ccoctl aws create-key-pair --output-dir ./new
 2023/02/16 14:46:31 Copying signing key for use by installer
 ```
 
-## Generate JSON Web Key Set keys.json File
+### Generate JSON Web Key Set keys.json File
 
 ```sh
 $ go run jwks.go ./old/serviceaccount-signer.public ./new/serviceaccount-signer.public
@@ -97,7 +103,7 @@ The resultant key set will include a public key block for each public key provid
 
 Replace the `keys.json` file within the OIDC with the newly generated key set that includes both the old and new public key.
 
-## Modify `next-bound-service-account-signing-key` to Contain the New Key Pair
+### Modify `next-bound-service-account-signing-key` to Contain the New Key Pair
 
 ```sh
 $ PRIVKEY=`base64 -w0 ./new/serviceaccount-signer.private`
@@ -125,16 +131,9 @@ metadata:
   namespace: openshift-kube-apiserver
 ```
 
-API server pods will be automatically replaced.
-
-```
-$ oc get po -n openshift-kube-apiserver
-kube-apiserver-ip-10-0-129-158.ec2.internal         5/5     Running     0          7m11s
-kube-apiserver-ip-10-0-148-96.ec2.internal          5/5     Running     0          11m
-kube-apiserver-ip-10-0-165-220.ec2.internal         5/5     Running     0          3m12s
-```
-
 The `bound-service-account-signing-key` secret in the `openshift-kube-apiserver` namespace will be automatically updated to contain the key we configured within the `next-bound-service-account-signing-key` secret.
+
+### Verify tokens are signed by the new key
 
 Some time later...
 
