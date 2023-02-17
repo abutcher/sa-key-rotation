@@ -70,6 +70,8 @@ $ ccoctl aws create-key-pair --output-dir ./new
 
 ### Generate JSON Web Key Set keys.json File
 
+Generate a `keys.json` file that contains old and new public keys.
+
 ```sh
 $ go run jwks.go ./old/serviceaccount-signer.public ./new/serviceaccount-signer.public
 2023/02/16 15:47:59 Reading public key
@@ -103,7 +105,9 @@ The resultant key set will include a public key block for each public key provid
 
 Replace the `keys.json` file within the OIDC with the newly generated key set that includes both the old and new public key.
 
-### Modify `next-bound-service-account-signing-key` to Contain the New Key Pair
+### Modify `next-bound-service-account-signing-key` secret to Contain the New Key Pair
+
+Place our newly generated keys in the `next-bound-service-account-signing-key` secret to trigger rotation.
 
 ```sh
 $ PRIVKEY=`base64 -w0 ./new/serviceaccount-signer.private`
